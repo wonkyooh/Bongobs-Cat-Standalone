@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CubismFramework.hpp>
+#include <string>
 
 namespace Define {
 
@@ -24,7 +25,9 @@ namespace Define {
     extern const csmInt32 PriorityForce;            ///< モーションの優先度定数: 3
 
     // Frameworkから出力するログのレベル設定
-    extern const CubismFramework::Option::LogLevel CubismLoggingLevel;
+    // Mutable (was const): the app config (config.json / --verbose) picks the
+    // level at startup, before VtuberDelegate::InitializeCubism() runs.
+    extern CubismFramework::Option::LogLevel CubismLoggingLevel;
     extern const csmBool DebugMod;
     // デフォルトのレンダーターゲットサイズ
     extern const csmInt32 RenderTargetWidth;
@@ -38,9 +41,19 @@ namespace Define {
     extern const csmInt32 KeyAmount;
     extern const csmChar *KeyDefine[];
 
-    extern const csmChar *ResourcesPath;
+    // Absolute path to the "Bango Cat/" resources root, trailing slash included.
+    // Was `const csmChar*` relative to CWD; now mutable and derived from the
+    // executable location by main.cpp before the first VtuberDelegate use.
+    extern std::string ResourcesPath;
     extern const csmChar *ModePath;
     extern const csmChar *MaskPath;
     extern const csmChar *KPSPath;
+
+    // Sets Define::ResourcesPath. Must be called before the first
+    // VtuberDelegate::GetInstance() (View's ctor reads ResourcesPath immediately).
+    void SetResourcesRoot(const std::string &path);
+
+    // Sets Define::CubismLoggingLevel. Must be called before InitializeCubism().
+    void SetLogLevel(CubismFramework::Option::LogLevel level);
 
     }

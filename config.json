@@ -1,0 +1,42 @@
+{
+  "mode": "standard",
+  "window": {
+    "width": 1280,
+    "height": 768,
+    "x": null,
+    "y": null,
+    "borderless": false,
+    "always_on_top": false,
+    "prevent_minimize": true,
+    "title": "Bongobs Cat"
+  },
+  "background": {
+    "color": "#00FF00",
+    "transparent": false
+  },
+  "cat": {
+    "live2d": true,
+    "mask": false,
+    "scale": 1.83,
+    "x": 0.0,
+    "y": 0.02,
+    "speed": 1.0,
+    "random_motion": true,
+    "breath": true,
+    "eyeblink": true,
+    "track": true
+  },
+  "input": {
+    "backend": "hook",
+    "relative_mouse": false,
+    "mouse_horizontal_flip": true,
+    "mouse_vertical_flip": true
+  },
+  "render": {
+    "vsync": true,
+    "max_fps": 60
+  },
+  "log": {
+    "level": "info"
+  }
+}

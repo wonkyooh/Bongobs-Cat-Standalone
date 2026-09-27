@@ -494,11 +494,14 @@ CubismMotionQueueEntryHandle Model::StartMotion(const csmChar* group, csmInt32 n
 
         csmByte* buffer;
         csmSizeInt size;
+        csmFloat32 fadeTime; // declared (uninitialized) before the goto below: a goto
+                             // may not jump past a variable's initialization, only a
+                             // bare declaration (MSVC allowed the old ordering; Clang/GCC don't)
         buffer = CreateBuffer(path.GetRawString(), &size);
 	if (size == 0)
 		goto end;
 	motion = static_cast<CubismMotion*>(LoadMotion(buffer, size, NULL, onFinishedMotionHandler));
-        csmFloat32 fadeTime = _modelSetting->GetMotionFadeInTimeValue(group, no);
+        fadeTime = _modelSetting->GetMotionFadeInTimeValue(group, no);
         if (fadeTime >= 0.0f)
         {
             motion->SetFadeInTime(fadeTime);

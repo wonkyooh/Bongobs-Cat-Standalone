@@ -6,47 +6,49 @@
 #include"VtuberDelegate.hpp"
 
 namespace {
-    static bool isLoad;
+    // Standalone app only ever drives a single instance (id 0), so this is
+    // just a one-shot init guard now instead of a ref count.
+    static bool isLoad = false;
 
-    static bool isInit;
-
-    static int initCount = 0;
+    static bool isInit = false;
     }
 
 void VtuberFrameWork::InitVtuber(int id)
 {
-    initCount++;
-    if (initCount == 0) {
-	isInit = false;
-    }
     isLoad = VtuberDelegate::GetInstance()->LoadResource(id);
 }
 
-void VtuberFrameWork::ReanderVtuber(int targatid, char *data, int bufferWidth,
-				    int bufferheight)
+bool VtuberFrameWork::InitializeGraphics(int id, GLFWwindow *window)
 {
-    if (isLoad) {
-    
-    if (initCount>0 && !isInit) {
-	    isInit = true;
-	    VtuberDelegate::GetInstance()->Initialize(targatid);
-    }
+    if (!isLoad)
+	    return false;
 
-    if (isInit)
-	VtuberDelegate::GetInstance()->Reader(targatid, data, bufferWidth,bufferheight);
+    if (!isInit)
+	    isInit = VtuberDelegate::GetInstance()->Initialize(id, window);
 
-    }
+    return isInit;
+}
+
+void VtuberFrameWork::RenderFrame(int id)
+{
+    if (isLoad && isInit)
+	    VtuberDelegate::GetInstance()->RenderFrame(id);
 }
 
 void VtuberFrameWork::UinitVtuber(int id)
-{   
-    initCount--;
-    if (initCount == 0 && isInit) {
+{
+    if (isInit) {
 	    VtuberDelegate::GetInstance()->ReleaseResource(id);
-	    isInit = false;
 	    VtuberDelegate::GetInstance()->Release();
 	    VtuberDelegate::ReleaseInstance();
+	    isInit = false;
     }
+    isLoad = false;
+}
+
+void VtuberFrameWork::SetWindow(int id, double x, double y, int width, int height, double scale)
+{
+    VtuberDelegate::GetInstance()->UpdataViewWindow(x, y, width, height, scale, id);
 }
 
 void VtuberFrameWork::UpData(int id,double _x, double _y, int width, int height,
@@ -78,10 +80,3 @@ int VtuberFrameWork::GetHeight(int id)
 {
 	return VtuberDelegate::GetInstance()->getBufferHeight(id);
 }
-
-
-
-
-
-
-

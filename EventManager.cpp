@@ -7,7 +7,7 @@
 
 #include "EventManager.hpp"
 #include <math.h>
-#include <Windows.h>
+#include "input/Input.hpp"
 
 EventManager::EventManager()
     : _startY(0.0f)
@@ -95,44 +95,47 @@ void EventManager::MouseEventMoved(int width, int height, float deviceX,
 
 void EventManager::KeyEventDown(int key)
 {
-	_keyEvent[key].KeyBoardSignal = true;
+	if (key < 0 || key >= KEYAMOUT) {
+		return;
+	}
+	_keyEvent[key].KeyBoardSignal.store(true, std::memory_order_relaxed);
 }
 
 void EventManager::KeyEventUp(int key) {
-	_keyEvent[key].KeyBoardSignal = false;
+	if (key < 0 || key >= KEYAMOUT) {
+		return;
+	}
+	_keyEvent[key].KeyBoardSignal.store(false, std::memory_order_relaxed);
 }
 
 void EventManager::LeftButtonDown() {
-	_leftButton = true;
+	_leftButton.store(true, std::memory_order_relaxed);
 }
 
 void EventManager::LeftButtonUp() {
-	_leftButton = false;
+	_leftButton.store(false, std::memory_order_relaxed);
 }
 
 void EventManager::RightButtonDown() {
-	_rightButton = true;
+	_rightButton.store(true, std::memory_order_relaxed);
 }
 
 void EventManager::RightButtonUp() {
-	_rightButton = false;
+	_rightButton.store(false, std::memory_order_relaxed);
 }
 
 void EventManager::SetRelativeMouse(int _rx, int _ry) {
-	_relativemouseX += _rx;
-	_relativemouseY += _ry;
+	_relativemouseX.fetch_add(_rx, std::memory_order_relaxed);
+	_relativemouseY.fetch_add(_ry, std::memory_order_relaxed);
 }
 
 void EventManager::GetRelativeMouse(int &_rx, int &_ry) {
-	_rx = _relativemouseX;
-	_ry = _relativemouseY;
+	_rx = _relativemouseX.load(std::memory_order_relaxed);
+	_ry = _relativemouseY.load(std::memory_order_relaxed);
 }
 
 void EventManager::GetCurrentMousePosition(int &_x, int &_y) {
-	POINT p;
-	GetCursorPos(&p);
-	_x = p.x;
-	_y = p.y;
+	Input::GetCursorPosition(_x, _y);
 }
 
 float EventManager::GetFlickDistance() const

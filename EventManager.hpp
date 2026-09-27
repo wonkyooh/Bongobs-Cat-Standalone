@@ -10,9 +10,10 @@
 #define KEYAMOUT 200
 
 #include <queue>
+#include <atomic>
 
 struct KeyEvent {
-	bool KeyBoardSignal;
+	std::atomic<bool> KeyBoardSignal;
 };
 
 
@@ -140,9 +141,9 @@ private:
 
     KeyEvent _keyEvent[KEYAMOUT];
 
-    bool _leftButton;
-    bool _rightButton;
+    std::atomic<bool> _leftButton;
+    std::atomic<bool> _rightButton;
 
-    int _relativemouseX;
-    int _relativemouseY;
+    std::atomic<int> _relativemouseX;
+    std::atomic<int> _relativemouseY;
 };

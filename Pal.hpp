@@ -19,7 +19,9 @@ public:
 
     static int GetAllDirName(const Csm::csmChar *csDir, Csm::csmChar **Files);
 
-    static const char *GetModelName(const char *filePath);
+    // Returns the first "*.model3.json" filename found directly under
+    // filePath, or "" if none exists (dir missing, empty, or no match).
+    static std::string GetModelName(const std::string &filePath);
 
     static void GetDesktopResolution(int &horizontal, int &vertical);
 };

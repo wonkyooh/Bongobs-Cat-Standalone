@@ -1,0 +1,18 @@
+# Build output
+build/
+build-*/
+dist/
+out/
+*.log
+
+# IDE
+.vs/
+.vscode/
+.idea/
+CMakeUserPresets.json
+
+# macOS
+.DS_Store
+
+# Regenerated into the source tree by GLEW's CMake on every configure
+thirdParty/glew/glew.pc

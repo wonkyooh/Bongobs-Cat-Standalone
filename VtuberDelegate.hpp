@@ -13,7 +13,6 @@
 
 class View;
 class LAppTextureManager;
-class Hook;
 /**
 * @brief   アプリケーションクラス。
 *   Cubism SDK の管理を行う。
@@ -43,7 +42,9 @@ public:
 
     void ReleaseResource(int id);
 
-    bool Initialize(int id);
+    // `window` must already be current-context'd by the caller (main.cpp owns
+    // the GLFW window and its lifetime; this no longer calls glfwInit/glfwCreateWindow).
+    bool Initialize(int id, GLFWwindow *window);
 
     void Release();
 
@@ -68,9 +69,9 @@ public:
 
 
     /**
-    * @brief 渲染一帧画面到指定缓冲
+    * @brief 渲染当前帧（不含清屏，由 main 的渲染循环负责）
     */
-    void Reader(int targatid, char *data, int bufferWidth, int bufferheight);
+    void RenderFrame(int id);
 
 
     void ChangeModel(const char *ModelName, int id);
@@ -111,9 +112,8 @@ private:
 
     LAppAllocator _cubismAllocator;              ///< Cubism SDK Allocator
     Csm::CubismFramework::Option _cubismOption;  ///< Cubism SDK Option
-    GLFWwindow* _window;                         ///< OpenGL ウィンドウ
+    GLFWwindow* _window;                         ///< OpenGL ウィンドウ（main.cpp が所有、ここでは保持のみ）
     View* _view;                             ///< View情報
-    Hook *_hook;
     LAppTextureManager* _textureManager;         ///< テクスチャマネージャー
 
     char *ModelFileName[MAXMODELCOUNT];		///模型文件夹的名称集合

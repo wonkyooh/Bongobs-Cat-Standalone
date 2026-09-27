@@ -11,7 +11,6 @@
 #include "Define.hpp"
 #include "Live2DManager.hpp"
 #include "LAppTextureManager.hpp"
-#include "Hook.hpp"
 #include "InfoReader.hpp"
 #include "EventManager.hpp"
 
@@ -21,12 +20,6 @@ using namespace Define;
 
 namespace {
 VtuberDelegate *s_instance = NULL;
-
-    static uint16_t VtuberCount = 0;
-
-    static bool isFirst = true;
-
-    static GLFWwindow *_window;
     }
 
 VtuberDelegate *VtuberDelegate::GetInstance()
@@ -60,45 +53,23 @@ void VtuberDelegate::ReleaseResource(int id) {
 	_view->Release(id);
 }
 
-bool VtuberDelegate::Initialize(int id)
+bool VtuberDelegate::Initialize(int id, GLFWwindow *window)
 {
-   
-    //Gl Init
-    if (isFirst) {
-	   
-	    isFirst = false;
-	    // GLFWの初期化
-	    if (glfwInit() == GL_FALSE)
-	    {
-		//return GL_FALSE;
-	    }
-	    
-	    // Windowの生成_
-	    glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
-	    glfwWindowHint(GLFW_SAMPLES, 16);
-	    _window = glfwCreateWindow(RenderTargetWidth, RenderTargetHeight, "bongo cat", NULL,NULL);
-	    if (_window == NULL)
-	    {
-		glfwTerminate();
-		return GL_FALSE;
-	    }
+    // main.cpp already created the window and made its context current;
+    // glewInit() still has to happen exactly once, on that current context.
+    _window = window;
 
-	    if (glfwRawMouseMotionSupported())
-		    glfwSetInputMode(_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-
-	    glfwMakeContextCurrent(_window);
-
-	    glewExperimental = GL_TRUE;
-	    if (glewInit() != GLEW_OK) {
-		    glfwTerminate();
-		    return GL_FALSE;
-	    }
-	    _hook = new Hook();
-	    _hook->Strat();
-    
+    glewExperimental = GL_TRUE;
+    if (glewInit() != GLEW_OK) {
+	    return GL_FALSE;
     }
-    
-    
+#ifdef __APPLE__
+    // glewInit() leaves a spurious GL_INVALID_ENUM behind on macOS (from an
+    // internal glGetString(GL_EXTENSIONS) call); drain it so it doesn't show
+    // up as a false positive in main.cpp's per-frame glGetError() drain.
+    glGetError();
+#endif
+
     // Cubism SDK の初期化
     InitializeCubism();
 
@@ -110,33 +81,23 @@ bool VtuberDelegate::Initialize(int id)
 
 void VtuberDelegate::Release()
 {
-        //glfwDestroyWindow(_window);
-
-        //glfwTerminate();
-
         delete _textureManager;
 
         delete _view;
 
         Live2DManager::ReleaseInstance();
 
-	CubismFramework::CleanUp();   
+	CubismFramework::CleanUp();
 
         CubismFramework::Dispose();
 }
 
-void VtuberDelegate::Reader(int id,char *buffer,int bufferWidth, int bufferheight)
+void VtuberDelegate::RenderFrame(int id)
 {
 	glEnable(GL_MULTISAMPLE);
 
-	glClearColor(0.0, 0.0, 0.0,0.0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//描画更新
+	//描画更新（クリアは main の描画ループ側で行う）
 	_view->Render(id);
-
-	//写入缓冲
-	glReadPixels(0, 0, bufferWidth, bufferheight, GL_RGBA, GL_UNSIGNED_BYTE,buffer);
-
 }
 
 void VtuberDelegate::UpdataViewWindow(double _x, double _y, int _width,
@@ -144,7 +105,7 @@ void VtuberDelegate::UpdataViewWindow(double _x, double _y, int _width,
 {
 	_renderInfo[_id].viewPoint_x = _x;
 	_renderInfo[_id].viewPoint_y = _y;
-	_renderInfo[_id].windowWidth = _width/32*32;
+	_renderInfo[_id].windowWidth = _width;
 	_renderInfo[_id].windowHeight = _height;
 	_renderInfo[_id].Scale = _scale;
 }
@@ -173,8 +134,8 @@ void VtuberDelegate::ChangeMode(const char *_mode,bool _live2d,bool _isUseMask, 
 		const char *a = _infoReader->ModePath[i];
 		if (strcmp(_mode, _infoReader->ModePath[i]) == 0) {
 			_view->setMod(i);
-			
-		}			
+
+		}
 	}
 	_view->Update(_live2d,_isUseMask);
 }
@@ -186,7 +147,7 @@ void VtuberDelegate::ChangeMouseMovement(bool _mouse) {
 
 void VtuberDelegate::ChangeModel(const char *ModelName, int id)
 {
-	
+
 }
 
 VtuberDelegate::VtuberDelegate()

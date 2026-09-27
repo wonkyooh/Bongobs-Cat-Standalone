@@ -1,64 +1,53 @@
 #include "Pal.hpp"
 #include <iostream>
 #include <fstream>
-#include <Model/CubismMoc.hpp>
-#include "Define.hpp"
-#include <Windows.h>
-#include <io.h>
-#include <codecvt>
 #include <filesystem>
+#include <cstdarg>
+#include <cstdio>
+#include <system_error>
+#include "Define.hpp"
+#include "Platform.hpp"
+#include "input/Input.hpp"
 
 using std::endl;
 using namespace Csm;
 using namespace std;
 using namespace Define;
 
+namespace fs = std::filesystem;
+
 csmByte* Pal::LoadFileAsBytes(const string filePath, csmSizeInt* outSize)
 {
-    //filePath;//
-    const char* path = filePath.c_str();
+    *outSize = 0;
 
-#if _WIN64
+    // u8path() so non-ASCII (e.g. Korean) paths round-trip correctly on every
+    // platform; on Windows this is what lets std::ifstream open a wide path.
+    fs::path path = fs::u8path(filePath);
 
-    //fix open wchar file path
-    int wchars_num = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    wchar_t *wstr = new wchar_t[wchars_num];
-    MultiByteToWideChar(CP_UTF8, 0, path, -1, wstr, wchars_num);
-
-    int size = 0;
-    struct _stat64 statBuf;
-    if (_wstat64(wstr, &statBuf) == 0)
-    {
-        size = statBuf.st_size;
-    } else {
-        size = 0;
-    }
-    *outSize = size;
-
-#else
-    int wchars_num = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    wchar_t *wstr = new wchar_t[wchars_num];
-    MultiByteToWideChar(CP_UTF8, 0, path, -1, wstr, wchars_num);
-
-    int size = 0;
-    struct _stat32 statBuf;
-    if (_wstat32(wstr, &statBuf) == 0) {
-	    size = statBuf.st_size;
-    } else {
-	    size = 0;
-    }
-#endif // X64
-    std::fstream file;
-    char* buf = new char[size];
-
-    file.open(wstr, std::ios::in | std::ios::binary);
+    std::ifstream file(path, std::ios::in | std::ios::binary);
     if (!file.is_open())
     {
-        return NULL;
+	PrintLog("[APP]file not found: %s", filePath.c_str());
+	return NULL;
     }
-    file.read(buf, size);
-    file.close();
-    delete [] wstr;
+
+    std::error_code ec;
+    uintmax_t size = fs::file_size(path, ec);
+    if (ec)
+    {
+	PrintLog("[APP]failed to stat file: %s", filePath.c_str());
+	return NULL;
+    }
+
+    char* buf = new char[size];
+    if (size > 0 && !file.read(buf, static_cast<std::streamsize>(size)))
+    {
+	PrintLog("[APP]failed to read file: %s", filePath.c_str());
+	delete[] buf;
+	return NULL;
+    }
+
+    *outSize = static_cast<csmSizeInt>(size);
     return reinterpret_cast<csmByte*>(buf);
 }
 
@@ -70,16 +59,18 @@ void Pal::ReleaseBytes(csmByte* byteData)
 void Pal::PrintLog(const csmChar *format, ...)
 {
     va_list args;
-    csmChar buf[256];
+    csmChar buf[2048];
     va_start(args, format);
-    vsnprintf_s(buf, sizeof(buf), format, args); // 標準出力でレンダリング
+    vsnprintf(buf, sizeof(buf), format, args);
+    va_end(args);
+
 #ifdef CSM_DEBUG_MEMORY_LEAKING
 // メモリリークチェック時は大量の標準出力がはしり重いのでprintfを利用する
-    std::printf(buf);
+    std::printf("%s", buf);
 #else
     std::cerr << buf << std::endl;
 #endif
-    va_end(args);
+    Platform::AppendLog(buf);
 }
 
 void Pal::PrintMessage(const csmChar* message)
@@ -89,22 +80,8 @@ void Pal::PrintMessage(const csmChar* message)
 
 bool Pal::IsFileExist(const Csm::csmChar *csDir)
 {
-	bool re;
-
-	int wchars_num = MultiByteToWideChar(CP_UTF8, 0, csDir, -1, NULL, 0);
-	wchar_t *wstr = new wchar_t[wchars_num];
-	MultiByteToWideChar(CP_UTF8, 0, csDir, -1, wstr, wchars_num);
-	
-	int size = 0;
-	struct _stat64 statBuf;
-	if (_wstat64(wstr, &statBuf) == 0) {
-		re = true;
-	} else {
-		re = false;
-	}
-	delete[] wstr;
-
-	return re;
+	std::error_code ec;
+	return fs::exists(fs::u8path(std::string(csDir)), ec);
 }
 
 int Pal::GetAllDirName(const Csm::csmChar *csDir, Csm::csmChar **Files)
@@ -112,31 +89,30 @@ int Pal::GetAllDirName(const Csm::csmChar *csDir, Csm::csmChar **Files)
 	return 0;
 }
 
-const char *Pal::GetModelName(const char *filePath)
+std::string Pal::GetModelName(const std::string &filePath)
 {
-	string _filepath = filePath;
-	_filepath += "/*.model3.json";
-
-	struct _finddata_t fileInfo;
-	long long findResult = _findfirst(_filepath.c_str(), &fileInfo);
-	if (findResult == -1) {
-		_findclose(findResult);
+	std::error_code ec;
+	fs::path dir = fs::u8path(filePath);
+	if (!fs::exists(dir, ec) || !fs::is_directory(dir, ec))
 		return "";
+
+	const std::string suffix = ".model3.json";
+	for (const auto &entry : fs::directory_iterator(dir, ec))
+	{
+		if (ec)
+			break;
+		if (!entry.is_regular_file())
+			continue;
+
+		std::string name = entry.path().filename().u8string();
+		if (name.size() >= suffix.size() &&
+		    name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
+			return name;
 	}
-	_findclose(findResult);
 
-	string _filename = fileInfo.name;
-	char *buf = new char[_filename.size()+1];
-	buf[_filename.size()] = 0x00;
-	memcpy(buf, _filename.c_str(), _filename.size());
-
-	return buf;
+	return "";
 }
 
 void Pal::GetDesktopResolution(int &horizontal, int &vertical) {
-	RECT desktop;
-	const HWND hDesktop = GetDesktopWindow();
-	GetWindowRect(hDesktop, &desktop);
-	horizontal = desktop.right;
-	vertical = desktop.bottom;
+	Input::GetDesktopSize(horizontal, vertical);
 }

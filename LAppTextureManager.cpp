@@ -40,6 +40,11 @@ LAppTextureManager::TextureInfo* LAppTextureManager::CreateTextureFromPngFile(st
     unsigned char* address;
 
     address = Pal::LoadFileAsBytes(fileName, &size);
+    if (address == NULL || size == 0)
+    {
+        Pal::PrintLog("[APP]texture not found: %s", fileName.c_str());
+        return NULL;
+    }
 
     // png情報を取得する
     png = stbi_load_from_memory(
@@ -49,6 +54,12 @@ LAppTextureManager::TextureInfo* LAppTextureManager::CreateTextureFromPngFile(st
         &height,
         &channels,
         STBI_rgb_alpha);
+    Pal::ReleaseBytes(address);
+    if (png == NULL)
+    {
+        Pal::PrintLog("[APP]texture could not be decoded: %s", fileName.c_str());
+        return NULL;
+    }
     {
 
 #ifdef PREMULTIPLIED_ALPHA_ENABLE
@@ -70,9 +81,8 @@ LAppTextureManager::TextureInfo* LAppTextureManager::CreateTextureFromPngFile(st
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    // 解放処理
+    // 解放処理（address は既に上で解放済み）
     stbi_image_free(png);
-    Pal::ReleaseBytes(address);
 
     LAppTextureManager::TextureInfo* textureInfo = new LAppTextureManager::TextureInfo();
     if (textureInfo != NULL)

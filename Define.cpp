@@ -31,7 +31,9 @@ namespace Define {
     const csmInt32 PriorityForce = 3;
 
     // Frameworkから出力するログのレベル設定
-    const CubismFramework::Option::LogLevel CubismLoggingLevel = CubismFramework::Option::LogLevel_Verbose;
+    // Default is Info; config.json's log.level (or --verbose) overrides this
+    // via SetLogLevel() before InitializeCubism() runs.
+    CubismFramework::Option::LogLevel CubismLoggingLevel = CubismFramework::Option::LogLevel_Info;
     const csmBool DebugMod = false;
 
     // デフォルトのレンダーターゲットサイズ
@@ -52,10 +54,22 @@ namespace Define {
 	    "f1","f2","f3","f4","f5","f6","f7","f8","f9","f10","f11","f12",
 	    "up","down","left","right","<",">","[","]","rshift","rctrl"};
 
-    const csmChar *ResourcesPath = "Bango Cat/";
+    // Overwritten by SetResourcesRoot() at startup; this default only matters
+    // if something reads it before main() sets the real (absolute) path.
+    std::string ResourcesPath = "Bango Cat/";
 
     const csmChar *ModePath= "mode/";
     const csmChar *MaskPath = "face/";
     const csmChar *KPSPath = "kps/";
+
+    void SetResourcesRoot(const std::string &path)
+    {
+	    ResourcesPath = path;
+    }
+
+    void SetLogLevel(CubismFramework::Option::LogLevel level)
+    {
+	    CubismLoggingLevel = level;
+    }
 
     }
