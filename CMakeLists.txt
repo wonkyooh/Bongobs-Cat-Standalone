@@ -166,6 +166,9 @@ add_custom_command(TARGET BongobsCat POST_BUILD
   COMMENT "[BongobsCat] copying Resources/ and config.json next to the executable"
 )
 
-install(TARGETS BongobsCat DESTINATION .)
-install(DIRECTORY ${RES_PATH} DESTINATION .)
-install(FILES config.json README.md LICENSE DESTINATION .)
+# Everything we ship goes into the "app" component. GLEW's own CMake adds
+# install rules for its libraries/headers (unspecified component), which would
+# otherwise land in the zip too -- so CI installs with `--component app`.
+install(TARGETS BongobsCat DESTINATION . COMPONENT app)
+install(DIRECTORY ${RES_PATH} DESTINATION . COMPONENT app)
+install(FILES config.json README.md LICENSE DESTINATION . COMPONENT app)

@@ -140,7 +140,7 @@ Requires Visual Studio 2022 or newer (with the "Desktop development with C++" wo
 ```
 cmake -S . -B build -A x64
 cmake --build build --config Release
-cmake --install build --config Release --prefix dist
+cmake --install build --config Release --prefix dist --component app
 ```
 
 ### macOS (development only)
