@@ -38,4 +38,20 @@ void AttachConsole();
 // the message to stderr as a fallback (there is no message box to show).
 void ShowErrorMessageBox(const std::string &title, const std::string &message);
 
+// True if this process is running elevated (Windows UAC "administrator").
+// Needed because Windows UIPI silently blocks a non-elevated process's
+// keyboard hooks/raw input from seeing input delivered to an elevated window
+// (e.g. an anti-cheat-protected game) -- see input/InputWin32Hook.cpp.
+// Non-Windows: always true (there is no elevation concept to check).
+bool IsElevated();
+
+// Relaunches the current executable elevated (triggers a UAC prompt) with
+// `args` as its command line (each element becomes one argument, quoted as
+// needed). Returns true if the elevated copy was launched -- the caller
+// should exit right away rather than also keep running non-elevated. Returns
+// false if launching failed or the user declined the UAC prompt; the caller
+// should keep running normally (non-elevated) in that case. Non-Windows:
+// always false (nothing to relaunch elevated into).
+bool RelaunchElevated(const std::vector<std::string> &args);
+
 } // namespace Platform

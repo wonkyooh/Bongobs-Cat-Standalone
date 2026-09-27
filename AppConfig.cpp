@@ -171,6 +171,7 @@ AppConfig AppConfig::LoadFromFile(const std::string &path)
 	cfg.input.relativeMouse = GetBool(inputObj, "relative_mouse", cfg.input.relativeMouse);
 	cfg.input.mouseHorizontalFlip = GetBool(inputObj, "mouse_horizontal_flip", cfg.input.mouseHorizontalFlip);
 	cfg.input.mouseVerticalFlip = GetBool(inputObj, "mouse_vertical_flip", cfg.input.mouseVerticalFlip);
+	cfg.input.runAsAdmin = GetBool(inputObj, "run_as_admin", cfg.input.runAsAdmin);
 
 	const Json::Value &renderObj = GetObject(root, "render");
 	cfg.render.vsync = GetBool(renderObj, "vsync", cfg.render.vsync);
@@ -204,6 +205,8 @@ CliOptions ParseCliOptions(const std::vector<std::string> &args, const std::stri
 			opts.console = true;
 		} else if (arg == "--verbose") {
 			opts.verbose = true;
+		} else if (arg == "--elevate") {
+			opts.elevate = true;
 		} else if (arg == "--help" || arg == "-h" || arg == "/?") {
 			opts.help = true;
 		}
@@ -224,5 +227,6 @@ void PrintUsage()
 		"  --mode <name>     Overrides config.json's \"mode\"\n"
 		"  --console         Open a console window and mirror the log there (Windows)\n"
 		"  --verbose         Force Cubism log level to verbose\n"
+		"  --elevate         Relaunch elevated (UAC) if not already running as administrator\n"
 		"  --help            Show this help and exit\n");
 }

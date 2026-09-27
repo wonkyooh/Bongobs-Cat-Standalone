@@ -15,6 +15,7 @@ Download `BongobsCat-windows-x64.zip` from the [Releases](../../releases/latest)
 - `BongobsCat.exe`
 - `config.json`
 - `Resources/Bango Cat/...`
+- `Run as admin.bat`
 - `README.md`
 - `LICENSE`
 
@@ -52,7 +53,9 @@ Don't minimize the window while capturing. If the labels above don't match your 
 
 ### Game tips
 
-- Prefer Borderless Windowed over Exclusive Fullscreen if the cat capture freezes or stops updating.
+- **Prefer Borderless Windowed over Exclusive Fullscreen.** Exclusive Fullscreen lets a game change the desktop resolution, and Windows responds by force-shrinking this (fixed-size) window, which leaves the capture stale until it's put back — the usual symptom is black bars or a frozen/stretched capture. Borderless Windowed never changes the desktop resolution, so this can't happen. BongobsCat detects and restores its own window size automatically once the desktop is back to normal, but see the capture-source note below.
+- Putting the Bongobs Cat window on a second monitor also sidesteps this entirely, even if the game itself stays in Exclusive Fullscreen on the main display.
+- After any resolution change (or if you suspect one happened while you weren't looking), some capture software needs its source toggled off and back on to re-acquire the window. If the capture looks frozen, blank, or stuck at the old size even after BongobsCat's own window is back to normal, try that first.
 - The Bongobs Cat window doesn't need to stay visible on top of your game. Window capture reads a window's contents regardless of its stacking order or on-screen visibility, as long as it isn't minimized, so it's fine to let the game cover it completely.
 
 ## Configuration
@@ -65,7 +68,7 @@ Settings live in `config.json` next to `BongobsCat.exe` and are loaded on startu
   "window": { "width": 1280, "height": 768, "x": null, "y": null, "borderless": false, "always_on_top": false, "prevent_minimize": true, "title": "Bongobs Cat" },
   "background": { "color": "#00FF00", "transparent": false },
   "cat": { "live2d": true, "mask": false, "scale": 1.83, "x": 0.0, "y": 0.02, "speed": 1.0, "random_motion": true, "breath": true, "eyeblink": true, "track": true },
-  "input": { "backend": "hook", "relative_mouse": false, "mouse_horizontal_flip": true, "mouse_vertical_flip": true },
+  "input": { "backend": "hook", "relative_mouse": false, "mouse_horizontal_flip": true, "mouse_vertical_flip": true, "run_as_admin": false },
   "render": { "vsync": true, "max_fps": 60 },
   "log": { "level": "info" }
 }
@@ -83,7 +86,7 @@ Settings live in `config.json` next to `BongobsCat.exe` and are loaded on startu
 | `window.prevent_minimize` | boolean | `true` | Blocks the window from being minimized. On by default because Windows Graphics Capture cannot capture a minimized window. |
 | `window.title` | string | `"Bongobs Cat"` | The window's title text. This is what you look for when picking a capture source in OBS or 프릭샷. |
 | `background.color` | string | `"#00FF00"` | The solid chroma-key background color, as a hex code. |
-| `background.transparent` | boolean | `false` | Experimental true-transparency mode used instead of a solid background color. Some capture software renders this as solid black, so the opaque-background-plus-chroma-key approach above is the one to rely on. |
+| `background.transparent` | boolean | `false` | Experimental true-transparency mode used instead of a solid background color; forces `window.borderless` on too (a title bar can't be transparent). No chroma keying needed if your capture software supports it, but some software renders this as solid black instead, so the opaque-background-plus-chroma-key approach above is the one to rely on. See [Removing the background](#removing-the-background). |
 | `cat.live2d` | boolean | `true` | Renders the Live2D model. |
 | `cat.mask` | boolean | `false` | Enables the face-overlay images from `Resources/Bango Cat/face`, toggled at runtime with F1-F4. |
 | `cat.scale` | float | `1.83` | Model scale. |
@@ -98,9 +101,17 @@ Settings live in `config.json` next to `BongobsCat.exe` and are loaded on startu
 | `input.relative_mouse` | boolean | `false` | When `true`, drives the paw from raw relative mouse deltas instead of the absolute cursor position. Useful for games that lock or hide the cursor. |
 | `input.mouse_horizontal_flip` | boolean | `true` | Flips the horizontal axis used for mouse tracking. |
 | `input.mouse_vertical_flip` | boolean | `true` | Flips the vertical axis used for mouse tracking. |
+| `input.run_as_admin` | boolean | `false` | Relaunches elevated (triggers a UAC prompt) on startup if not already running as administrator. Needed for input to register while an anti-cheat-protected game runs elevated. See [Input capture & games](#input-capture--games). |
 | `render.vsync` | boolean | `true` | Enables vertical sync. |
 | `render.max_fps` | integer | `60` | Caps the frame rate. |
 | `log.level` | string | `"info"` | Log verbosity written to `BongobsCat.log`. `--verbose` on the command line forces verbose output regardless of this setting. |
+
+### Removing the background
+
+Two options, in order of reliability:
+
+1. **Default: solid green + Chroma Key filter.** `background.color` stays `#00FF00` and `background.transparent` stays `false`. Key it out in your capture software as described in [Add to your stream](#add-to-your-stream). This works everywhere.
+2. **Experimental: `background.transparent: true`.** Makes the window itself transparent instead, so there's nothing to key out. This needs your capture software to support per-pixel alpha — OBS's "Windows 10 (1903 and up)" (Windows Graphics Capture) method does. Some software may not; 프릭샷 specifically hasn't been verified and may show solid black instead, in which case fall back to option 1.
 
 ### Command-line flags
 
@@ -110,6 +121,7 @@ Settings live in `config.json` next to `BongobsCat.exe` and are loaded on startu
 | `--mode <name>` | Override `mode` for this launch only. |
 | `--console` | Attach a console window so you can see log output live. |
 | `--verbose` | Force verbose logging. |
+| `--elevate` | Relaunch elevated (UAC prompt) if not already running as administrator. Same effect as `input.run_as_admin: true`, for a single launch. |
 | `--help` | Print usage and exit. |
 
 ## Input capture & games
@@ -119,14 +131,21 @@ Bongobs Cat captures keyboard and mouse input using one of two backends, selecte
 - **`hook` (default)** — Windows low-level keyboard and mouse hooks. This works system-wide, including while a game has focus, and is the same underlying mechanism OBS hotkeys and AutoHotkey use. It does not inject a DLL into any other process, so anti-cheat systems generally tolerate it.
 - **`rawinput`** — the Raw Input API, registered with `RIDEV_INPUTSINK`. Also focus-independent. Try this backend if an overlay or a game's anti-cheat setup is starving the low-level hooks, or if keys intermittently stop registering with the default backend.
 
-**Elevation and UIPI**: Windows User Interface Privilege Isolation (UIPI) blocks a normal-privilege process from observing input delivered to an elevated ("Run as administrator") window. If keys only fail to register in one specific game, that game is probably running elevated — run `BongobsCat.exe` as administrator too.
+**Elevation and UIPI**: Windows User Interface Privilege Isolation (UIPI) blocks a normal-privilege process from observing input delivered to an elevated ("Run as administrator") window. If keys only fail to register in one specific game, that game is probably running elevated, so BongobsCat needs to run elevated too. Three ways to do that, in order of convenience:
+
+- Set `"run_as_admin": true` under `"input"` in `config.json` (or launch with `--elevate`) so it prompts for UAC automatically every time it starts.
+- Double-click `Run as admin.bat`, shipped next to `BongobsCat.exe`.
+- Right-click `BongobsCat.exe` itself and choose **Run as administrator**.
+
+Elevation is opt-in — the app never demands admin rights on its own (the manifest requests `asInvoker`), so people who don't need it never see a UAC prompt.
 
 **Privacy**: neither backend records, logs, or transmits keystrokes or mouse movement anywhere. They're only used to flip which on-screen paw or key state the cat displays.
 
 ## Troubleshooting
 
-- **Keys aren't detected in a specific game** -> that game is likely running elevated; run `BongobsCat.exe` as administrator. Also try setting `input.backend` to `"rawinput"`. Check `BongobsCat.log` (or relaunch with `--console`) to confirm which input backend started and whether it reported an error — individual keystrokes are never logged.
-- **Capture shows solid black** -> switch the capture method to Windows Graphics Capture / "Windows 10 (1903 and up)" in OBS (or the equivalent option in 프릭샷). Also make sure `background.transparent` is `false`.
+- **Keys aren't detected in a specific game** -> that game is likely running elevated; run BongobsCat elevated too — set `input.run_as_admin: true`, pass `--elevate`, double-click `Run as admin.bat`, or right-click `BongobsCat.exe` -> Run as administrator. Also try setting `input.backend` to `"rawinput"`. Check `BongobsCat.log` (or relaunch with `--console`) to confirm which input backend started and whether it reported an error — individual keystrokes are never logged.
+- **Capture shows solid black** -> switch the capture method to Windows Graphics Capture / "Windows 10 (1903 and up)" in OBS (or the equivalent option in 프릭샷). Also make sure `background.transparent` is `false` (see [Removing the background](#removing-the-background) — the transparent mode is exactly the experimental one that some capture software shows as black).
+- **Capture shows black bars, is frozen, or looks stretched after an Exclusive Fullscreen game** -> the game likely changed the desktop resolution and Windows shrank the window; BongobsCat restores its own window size automatically once the resolution is back to normal, but the capture source itself may still need to be toggled off and on to re-acquire it. Prefer Borderless Windowed to avoid this entirely — see [Game tips](#game-tips).
 - **The window isn't listed in the capture-source picker, or the capture is frozen** -> make sure `BongobsCat.exe` is running and not minimized (`window.prevent_minimize` defaults to on, but double-check). Alt-Tab to confirm the window exists.
 - **"Resources folder not found" or a similar startup error** -> keep the `Resources` folder next to `BongobsCat.exe`; don't unzip only the executable.
 - **Windows SmartScreen warns "Windows protected your PC"** -> expected for an unsigned executable. Click "More info", then "Run anyway" — or build from source yourself if you'd rather not.

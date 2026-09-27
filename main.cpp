@@ -138,7 +138,28 @@ int RunApp(int argc, char **argv)
 
 	Define::SetLogLevel(config.logLevel);
 
+	// A title bar can't be transparent (and would get captured), so a
+	// transparent background implies borderless regardless of what was
+	// configured. always_on_top is independent and still honored either way.
+	if (config.background.transparent && !config.window.borderless) {
+		config.window.borderless = true;
+		Pal::PrintLog("[APP]transparent background: forcing borderless");
+	}
+
 	Pal::PrintLog("[APP]Bongobs Cat starting; exeDir=%s configPath=%s", exeDir.c_str(), cli.configPath.c_str());
+
+	// Elevation: some games run elevated (anti-cheat), and Windows UIPI then
+	// blocks our non-elevated hooks/raw input from seeing their keystrokes.
+	// If configured/requested, relaunch elevated before creating any window.
+	// IsElevated() is true in the relaunched copy, so this can't loop.
+	if ((config.input.runAsAdmin || cli.elevate) && !Platform::IsElevated()) {
+		if (Platform::RelaunchElevated(cliArgs)) {
+			Pal::PrintLog("[APP]relaunching elevated");
+			return 0;
+		}
+		Pal::PrintLog(
+			"[APP]WARNING: elevation was declined; continuing without admin -- input may not register in elevated games");
+	}
 
 	std::string resourcesRoot = exeDir + "/Resources/Bango Cat/";
 	Define::SetResourcesRoot(resourcesRoot);
@@ -268,8 +289,54 @@ int RunApp(int argc, char **argv)
 		       : Clock::duration::zero();
 	Clock::time_point nextFrame = Clock::now() + frameDuration;
 
+	// Window-size watchdog state: true while recovering from an externally
+	// forced resize, so the fix-up below and its log line fire once per
+	// episode instead of every single frame until it clears.
+	bool sizeRestorePending = false;
+
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
+
+		// An exclusive-fullscreen game can change the desktop resolution,
+		// which makes Windows force-shrink this (non-resizable) window and
+		// leaves the capture region stale. Put the size (and, if the user
+		// pinned one, the position) back once the desktop can fit it again.
+		// Borderless windows are skipped: borderless games never change the
+		// desktop resolution, and those users place the window themselves
+		// (dragging only ever changes position, never size, so this is
+		// drag-safe for the non-borderless case too).
+		if (!config.window.borderless) {
+			int curWidth = 0, curHeight = 0;
+			glfwGetWindowSize(window, &curWidth, &curHeight);
+
+			if (curWidth == config.window.width && curHeight == config.window.height) {
+				sizeRestorePending = false;
+			} else {
+				// Zero-initialized so a failed query (e.g. null monitor)
+				// leaves them 0, which fails the fit test below -> no resize.
+				int workX = 0, workY = 0, workWidth = 0, workHeight = 0;
+				GLFWmonitor *primary = glfwGetPrimaryMonitor();
+				if (primary)
+					glfwGetMonitorWorkarea(primary, &workX, &workY, &workWidth, &workHeight);
+				if (workWidth >= config.window.width && workHeight >= config.window.height) {
+					glfwSetWindowSize(window, config.window.width, config.window.height);
+					if (config.window.hasX || config.window.hasY) {
+						int curX, curY;
+						glfwGetWindowPos(window, &curX, &curY);
+						glfwSetWindowPos(window, config.window.hasX ? config.window.x : curX,
+								  config.window.hasY ? config.window.y : curY);
+					}
+					if (!sizeRestorePending)
+						Pal::PrintLog(
+							"[APP]window was resized externally (%dx%d), restoring to %dx%d",
+							curWidth, curHeight, config.window.width,
+							config.window.height);
+					sizeRestorePending = true;
+				}
+				// else: the desktop is still too small to fit the configured
+				// size (mid resolution-change) -- retry next frame.
+			}
+		}
 
 		int fbWidth = 0, fbHeight = 0;
 		glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
@@ -281,8 +348,15 @@ int RunApp(int argc, char **argv)
 
 		// Clear the whole framebuffer (letterbox bars included) ...
 		glViewport(0, 0, fbWidth, fbHeight);
-		glClearColor(config.background.r, config.background.g, config.background.b,
-			     config.background.transparent ? 0.0f : 1.0f);
+		if (config.background.transparent) {
+			// The OS compositor (DWM / macOS) treats the framebuffer as
+			// PREMULTIPLIED alpha, so a "transparent" pixel must be all
+			// zero -- clearing to (green, 0) would leave the green added
+			// on top and tint the whole window green. Use (0,0,0,0).
+			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+		} else {
+			glClearColor(config.background.r, config.background.g, config.background.b, 1.0f);
+		}
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// ... then draw the fixed-aspect canvas into the largest centered

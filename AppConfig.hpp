@@ -46,6 +46,10 @@ struct AppConfig {
 		bool relativeMouse = false;
 		bool mouseHorizontalFlip = true;
 		bool mouseVerticalFlip = true;
+		// Relaunch elevated (UAC) on startup if not already elevated. Works
+		// around Windows UIPI blocking our hooks/raw input from seeing
+		// keystrokes delivered to an elevated (anti-cheat) game window.
+		bool runAsAdmin = false;
 	};
 
 	struct RenderConfig {
@@ -76,6 +80,7 @@ struct CliOptions {
 	bool console = false;
 	bool verbose = false;
 	bool help = false;
+	bool elevate = false; // relaunch elevated (UAC) if not already elevated
 };
 
 // `args` excludes argv[0]. `exeDir` resolves the default --config location.

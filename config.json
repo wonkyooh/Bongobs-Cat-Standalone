@@ -30,7 +30,8 @@
     "backend": "hook",
     "relative_mouse": false,
     "mouse_horizontal_flip": true,
-    "mouse_vertical_flip": true
+    "mouse_vertical_flip": true,
+    "run_as_admin": false
   },
   "render": {
     "vsync": true,

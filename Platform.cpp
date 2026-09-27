@@ -65,6 +65,40 @@ std::wstring Utf8ToWide(const std::string &utf8)
 	MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, out.data(), size);
 	return out;
 }
+
+// Quotes/escapes one argument per the Win32 argv convention (the same rules
+// CommandLineToArgvW parses by), so args containing spaces or quotes survive
+// being joined into a single command-line string for ShellExecuteW.
+std::wstring QuoteArgForWindows(const std::wstring &arg)
+{
+	if (!arg.empty() && arg.find_first_of(L" \t\"") == std::wstring::npos)
+		return arg;
+
+	std::wstring out = L"\"";
+	for (size_t i = 0; i < arg.size();) {
+		size_t backslashes = 0;
+		while (i < arg.size() && arg[i] == L'\\') {
+			backslashes++;
+			i++;
+		}
+		if (i == arg.size()) {
+			// Trailing backslashes: double them since the closing quote follows.
+			out.append(backslashes * 2, L'\\');
+			break;
+		} else if (arg[i] == L'"') {
+			// Backslashes before a literal quote: double them, then escape the quote.
+			out.append(backslashes * 2 + 1, L'\\');
+			out.push_back(L'"');
+			i++;
+		} else {
+			out.append(backslashes, L'\\');
+			out.push_back(arg[i]);
+			i++;
+		}
+	}
+	out.push_back(L'"');
+	return out;
+}
 #endif
 
 } // namespace
@@ -164,6 +198,55 @@ void ShowErrorMessageBox(const std::string &title, const std::string &message)
 	MessageBoxW(NULL, Utf8ToWide(message).c_str(), Utf8ToWide(title).c_str(), MB_OK | MB_ICONERROR);
 #else
 	std::fprintf(stderr, "%s: %s\n", title.c_str(), message.c_str());
+#endif
+}
+
+bool IsElevated()
+{
+#if defined(_WIN32)
+	HANDLE token = NULL;
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+		return false;
+
+	TOKEN_ELEVATION elevation;
+	DWORD size = sizeof(elevation);
+	bool elevated = false;
+	if (GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size))
+		elevated = elevation.TokenIsElevated != 0;
+
+	CloseHandle(token);
+	return elevated;
+#else
+	return true;
+#endif
+}
+
+bool RelaunchElevated(const std::vector<std::string> &args)
+{
+#if defined(_WIN32)
+	std::vector<wchar_t> buf(MAX_PATH);
+	for (;;) {
+		DWORD len = GetModuleFileNameW(NULL, buf.data(), static_cast<DWORD>(buf.size()));
+		if (len == 0)
+			return false;
+		if (len < buf.size())
+			break;
+		buf.resize(buf.size() * 2);
+	}
+	std::wstring exePath(buf.data());
+
+	std::wstring cmdLine;
+	for (size_t i = 0; i < args.size(); i++) {
+		if (i > 0)
+			cmdLine += L' ';
+		cmdLine += QuoteArgForWindows(Utf8ToWide(args[i]));
+	}
+
+	HINSTANCE result = ShellExecuteW(nullptr, L"runas", exePath.c_str(), cmdLine.c_str(), nullptr, SW_SHOWNORMAL);
+	return reinterpret_cast<INT_PTR>(result) > 32;
+#else
+	(void)args;
+	return false;
 #endif
 }
 

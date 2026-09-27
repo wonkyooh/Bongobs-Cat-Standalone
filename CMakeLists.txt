@@ -171,4 +171,4 @@ add_custom_command(TARGET BongobsCat POST_BUILD
 # otherwise land in the zip too -- so CI installs with `--component app`.
 install(TARGETS BongobsCat DESTINATION . COMPONENT app)
 install(DIRECTORY ${RES_PATH} DESTINATION . COMPONENT app)
-install(FILES config.json README.md LICENSE DESTINATION . COMPONENT app)
+install(FILES config.json README.md LICENSE "Run as admin.bat" DESTINATION . COMPONENT app)
