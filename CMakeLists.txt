@@ -40,7 +40,7 @@ add_library(Live2DCubismCore STATIC IMPORTED)
 
 if(WIN32)
   if(MSVC_VERSION GREATER_EQUAL 1920)
-    set(CUBISM_MSVC_TOOLSET 142) # VS2019/VS2022; v14x toolsets are ABI-compatible, no 143 libs are shipped
+    set(CUBISM_MSVC_TOOLSET 142) # VS2019/2022/2026; the 14.x toolsets are ABI-compatible and no newer libs are shipped
   elseif(MSVC_VERSION GREATER_EQUAL 1910)
     set(CUBISM_MSVC_TOOLSET 141) # VS2017
   else()

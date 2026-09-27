@@ -135,10 +135,10 @@ Bongobs Cat captures keyboard and mouse input using one of two backends, selecte
 
 ### Windows
 
-Requires Visual Studio 2022 (with the "Desktop development with C++" workload) and CMake 3.16 or later.
+Requires Visual Studio 2022 or newer (with the "Desktop development with C++" workload) and CMake 3.16 or later. CMake picks the newest installed Visual Studio by default; add `-G "Visual Studio 17 2022"` if you need to force a specific one.
 
 ```
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake -S . -B build -A x64
 cmake --build build --config Release
 cmake --install build --config Release --prefix dist
 ```
